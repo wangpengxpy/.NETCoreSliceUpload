@@ -1,0 +1,84 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+@{
+    ViewBag.Title = "Home Page";
+}
+<div class="form-horizontal" style="margin-top:80px;">
+    <div class="form-group">
+        <div class="col-md-10">
+            <input name="file" id="file" type="file" />
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-offset-2 col-md-10">
+            <input type="submit" id="submit" value="上传" class="btn btn-success" />
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript" src="~/js/jquery-3.4.1.min.js"></script>
+<script type="text/javascript">
+
+    $(function () {
+        $('#submit').click(function () {
+            UploadFile($('#file')[0].files);
+        });
+    });
+
+    function UploadFile(targetFile) {
+        // 创建上传文件分片缓冲区
+        var fileChunks = [];
+        // 目标文件
+        var file = targetFile[0];
+        // 设置分片缓冲区大小
+        var maxFileSizeMB = 8;
+        var bufferChunkSize = maxFileSizeMB * (1024 * 1024);
+        // 读取文件流其实位置
+        var fileStreamPos = 0;
+        // 设置下一次读取缓冲区初始大小
+        var endPos = bufferChunkSize;
+        // 文件大小
+        var size = file.size;
+        // 将文件进行循环分片处理塞入分片数组
+        while (fileStreamPos < size) {
+            var fileChunkInfo = {
+                file: file.slice(fileStreamPos, endPos),
+                start: fileStreamPos,
+                end: endPos
+            }
+            fileChunks.push(fileChunkInfo);
+            fileStreamPos = endPos;
+            endPos = fileStreamPos + bufferChunkSize;
+        }
+        // 获取上传文件分片总数量
+        var totalParts = fileChunks.length;
+        var partCount = 0;
+        // 循环调用上传每一片
+        while (chunk = fileChunks.shift()) {
+            partCount++;
+            // 上传文件命名约定
+            var filePartName = file.name + ".partNumber-" + partCount;
+            chunk.filePartName = filePartName;
+            // url参数
+            var url = 'partNumber=' + partCount + '&chunks=' + totalParts + '&size=' + bufferChunkSize + '&start=' + chunk.start + '&end=' + chunk.end + '&total=' + size;
+            chunk.urlParameter = url;
+            // 上传文件
+            UploadFileChunk(chunk);
+        }
+    }
+
+    function UploadFileChunk(chunk) {
+        var data = new FormData();
+        data.append("file", chunk.file, chunk.filePartName);
+        $.ajax({
+            url: '/api/upload/upload?' + chunk.urlParameter,
+            type: "post",
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: data,
+        });
+    }
+</script>
