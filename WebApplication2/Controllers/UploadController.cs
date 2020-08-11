@@ -1,8 +1,11 @@
 ﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Net.Http.Headers;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -40,7 +43,7 @@ namespace WebApplication2.Controllers
                 return BadRequest();
             }
 
-            var boundary = GetBoundary(context.Request.ContentType);
+            var boundary = GetBoundary();
             if (string.IsNullOrEmpty(boundary))
             {
                 return BadRequest();
@@ -88,17 +91,11 @@ namespace WebApplication2.Controllers
                 contentType.IndexOf("multipart/", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private string GetBoundary(string contentType)
+        private string GetBoundary()
         {
-            var elements = contentType.Split(' ');
-            var element = elements.Where(entry => entry.StartsWith("boundary=")).First();
-            var boundary = element.Substring("boundary=".Length);
-            if (boundary.Length >= 2 && boundary[0] == '"' &&
-                boundary[boundary.Length - 1] == '"')
-            {
-                boundary = boundary.Substring(1, boundary.Length - 2);
-            }
-            return boundary;
+            var mediaTypeHeaderContentType = MediaTypeHeaderValue.Parse(context.Request.ContentType);
+
+            return HeaderUtilities.RemoveQuotes(mediaTypeHeaderContentType.Boundary).Value;
         }
 
         private string GetFileName(string contentDisposition)
@@ -128,6 +125,17 @@ namespace WebApplication2.Controllers
 
             foreach (string file in filesList)
             {
+                if (FileSingleton.Instance.InUse(baseFileName))
+                {
+                    continue;
+                }
+
+                FileSingleton.Instance.AddFile(file);
+
+                if (System.IO.File.Exists(baseFileName))
+                {
+                    System.IO.File.Delete(baseFileName);
+                }
 
                 var sort = new FileSort
                 {
@@ -159,16 +167,12 @@ namespace WebApplication2.Controllers
             }
 
             //删除分片文件
-            DeleteFile(mergeFiles);
-
-        }
-
-        public void DeleteFile(List<FileSort> files)
-        {
-            foreach (var file in files)
+            Parallel.ForEach(mergeFiles, f =>
             {
-                System.IO.File.Delete(file.FileName);
-            }
+                System.IO.File.Delete(f.FileName);
+            });
+
+            FileSingleton.Instance.RemoveFile(baseFileName);
         }
     }
 }

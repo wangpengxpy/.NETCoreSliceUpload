@@ -8,10 +8,24 @@
         /// 当前分片
         /// </summary>
         public int PartNumber { get; set; }
+
+        private int size;
         /// <summary>
         /// 缓冲区大小
         /// </summary>
-        public int Size { get; set; }
+        public int Size
+        {
+            get { return size; }
+
+            set
+            {
+                if (size > 8)
+                {
+                    size = 8;
+                }
+                size = value;
+            }
+        }
         /// <summary>
         /// 分片总数
         /// </summary>
