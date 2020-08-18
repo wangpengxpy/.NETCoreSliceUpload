@@ -1,14 +1,13 @@
 ﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Net.Http.Headers;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using WebApplication2.Attributes;
 using WebApplication2.Models;
@@ -123,47 +122,57 @@ namespace WebApplication2.Controllers
 
             var mergeFiles = new List<FileSort>();
 
-            foreach (string file in filesList)
+            string fileNameNumber;
+            foreach (string fileName in filesList)
             {
-                if (FileSingleton.Instance.InUse(baseFileName))
+                fileNameNumber = fileName.Substring(fileName.IndexOf(FileSort.PART_NUMBER) + FileSort.PART_NUMBER.Length);
+
+                int.TryParse(fileNameNumber, out var number);
+                if (number <= 0)
                 {
                     continue;
                 }
 
-                FileSingleton.Instance.AddFile(file);
-
-                if (System.IO.File.Exists(baseFileName))
+                mergeFiles.Add(new FileSort
                 {
-                    System.IO.File.Delete(baseFileName);
-                }
-
-                var sort = new FileSort
-                {
-                    FileName = file
-                };
-
-                baseFileName = file.Substring(0, file.IndexOf(partToken));
-
-                var fileIndex = file.Substring(file.IndexOf(partToken) + partToken.Length);
-
-                int.TryParse(fileIndex, out var number);
-                if (number <= 0) { continue; }
-
-                sort.PartNumber = number;
-
-                mergeFiles.Add(sort);
+                    FileName = fileName,
+                    PartNumber = number
+                });
             }
 
             // 按照分片排序
-            var mergeOrders = mergeFiles.OrderBy(s => s.PartNumber).ToList();
+            var mergeFileSorts = mergeFiles.OrderBy(s => s.PartNumber).ToArray();
+
+            mergeFiles.Clear();
+            mergeFiles = null;
 
             // 合并文件
-            using var fileStream = new FileStream(baseFileName, FileMode.Create);
-            foreach (var fileSort in mergeOrders)
+            var fileFullPath = Path.Combine(_environment.WebRootPath, DEFAULT_FOLDER, baseFileName);
+            if (System.IO.File.Exists(fileFullPath))
             {
-                using FileStream fileChunk =
-                      new FileStream(fileSort.FileName, FileMode.Open);
-                await fileChunk.CopyToAsync(fileStream);
+                System.IO.File.Delete(fileFullPath);
+            }
+
+            bool error = false;
+            using var fileStream = new FileStream(fileFullPath, FileMode.Create);
+            foreach (FileSort fileSort in mergeFileSorts)
+            {
+                error = false;
+                do
+                {
+                    try
+                    {
+                        using FileStream fileChunk = new FileStream(fileSort.FileName, FileMode.Open, FileAccess.Read, FileShare.Read);
+                        await fileChunk.CopyToAsync(fileStream);
+                        error = false;
+                    }
+                    catch (Exception)
+                    {
+                        error = true;
+                        Thread.Sleep(0);
+                    }
+                }
+                while (error);
             }
 
             //删除分片文件
@@ -172,7 +181,8 @@ namespace WebApplication2.Controllers
                 System.IO.File.Delete(f.FileName);
             });
 
-            FileSingleton.Instance.RemoveFile(baseFileName);
+            Array.Clear(mergeFileSorts, 0, mergeFileSorts.Length);
+            mergeFileSorts = null;
         }
     }
 }
