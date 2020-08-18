@@ -3,16 +3,16 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Net.Http.Headers;
+using Polly;
+using slice_demo.Attributes;
+using slice_demo.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
-using WebApplication2.Attributes;
-using WebApplication2.Models;
 
-namespace WebApplication2.Controllers
+namespace slice_demo.Controllers
 {
     [Route("api/[controller]/[action]")]
     [ApiController]
@@ -143,9 +143,6 @@ namespace WebApplication2.Controllers
             // 按照分片排序
             var mergeFileSorts = mergeFiles.OrderBy(s => s.PartNumber).ToArray();
 
-            mergeFiles.Clear();
-            mergeFiles = null;
-
             // 合并文件
             var fileFullPath = Path.Combine(_environment.WebRootPath, DEFAULT_FOLDER, baseFileName);
             if (System.IO.File.Exists(fileFullPath))
@@ -153,36 +150,28 @@ namespace WebApplication2.Controllers
                 System.IO.File.Delete(fileFullPath);
             }
 
-            bool error = false;
             using var fileStream = new FileStream(fileFullPath, FileMode.Create);
-            foreach (FileSort fileSort in mergeFileSorts)
-            {
-                error = false;
-                do
-                {
-                    try
-                    {
-                        using FileStream fileChunk = new FileStream(fileSort.FileName, FileMode.Open, FileAccess.Read, FileShare.Read);
-                        await fileChunk.CopyToAsync(fileStream);
-                        error = false;
-                    }
-                    catch (Exception)
-                    {
-                        error = true;
-                        Thread.Sleep(0);
-                    }
-                }
-                while (error);
-            }
+
+            await Policy.Handle<IOException>()
+                      .RetryForeverAsync()
+                      .ExecuteAsync(async () =>
+                      {
+                          foreach (FileSort fileSort in mergeFileSorts)
+                          {
+                              using FileStream fileChunk =
+                                  new FileStream(fileSort.FileName, FileMode.Open,
+                                  FileAccess.Read, FileShare.Read);
+
+                              await fileChunk.CopyToAsync(fileStream);
+                          }
+                      });
+
 
             //删除分片文件
             Parallel.ForEach(mergeFiles, f =>
             {
                 System.IO.File.Delete(f.FileName);
             });
-
-            Array.Clear(mergeFileSorts, 0, mergeFileSorts.Length);
-            mergeFileSorts = null;
         }
     }
 }

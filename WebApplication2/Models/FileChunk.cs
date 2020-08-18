@@ -1,4 +1,4 @@
-﻿namespace WebApplication2.Models
+﻿namespace slice_demo.Models
 {
     public class FileChunk
     {

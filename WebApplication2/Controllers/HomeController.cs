@@ -5,9 +5,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using WebApplication2.Models;
+using slice_demo.Models;
 
-namespace WebApplication2.Controllers
+namespace slice_demo.Controllers
 {
     public class HomeController : Controller
     {

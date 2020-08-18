@@ -8,4 +8,8 @@
     <Folder Include="wwwroot\a658591407c04576cff0649dbff0d285\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Polly" Version="7.2.1" />
+  </ItemGroup>
+
 </Project>

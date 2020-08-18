@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System;
 
-namespace WebApplication2.Attributes
+namespace slice_demo.Attributes
 {
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
     public sealed class DisableFormValueModelBindingAttribute : Attribute, IResourceFilter
