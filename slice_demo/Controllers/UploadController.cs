@@ -122,10 +122,10 @@ namespace slice_demo.Controllers
 
             var mergeFiles = new List<FileSort>();
 
-            string fileNameNumber;
             foreach (string fileName in filesList)
             {
-                fileNameNumber = fileName.Substring(fileName.IndexOf(FileSort.PART_NUMBER) + FileSort.PART_NUMBER.Length);
+                var fileNameNumber = fileName.Substring(fileName.IndexOf(FileSort.PART_NUMBER)
+                    + FileSort.PART_NUMBER.Length);
 
                 int.TryParse(fileNameNumber, out var number);
                 if (number <= 0)
